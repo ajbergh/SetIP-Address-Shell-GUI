@@ -7,4 +7,5 @@ Script identifies with Linux OS you're running (Currently Supports CentOS and Ub
 ## Screenshots
 
 ![App Screenshot](/images/image_01.png)
-
+![App Screenshot](/images/image_02.png)
+![App Screenshot](/images/image_03.png)
