@@ -6,15 +6,31 @@ if ! dpkg -s newt &> /dev/null; then
     sudo apt-get install -y newt
 fi
 
+# Get the name of the Linux distribution
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$NAME
+elif type lsb_release >/dev/null 2>&1; then
+    OS=$(lsb_release -si)
+else
+    OS=$(uname -s)
+fi
+
+# Print the name of the Linux distribution
+#echo "Detected Linux distribution: $OS"
+
+
+
 # Prompt user for DHCP or static IP address
-dhcp_or_static=$(whiptail --title "IP Configuration" --menu "Select IP configuration method" 15 60 2 \
+dhcp_or_static=$(whiptail --title "IP Configuration" --menu "Select IP configuration method" 15 60 2 --backtitle "Detected Linux distribution: $OS" \
 "DHCP" "Obtain IP address automatically" \
 "Static" "Specify static IP address" 3>&1 1>&2 2>&3)
 
 if [[ "$dhcp_or_static" = "DHCP" ]]; then
-  # Set interface to DHCP
-  interface_name=$(ip -o -4 route show to default | awk '{print $5}')
-  cat << EOF > /etc/netplan/01-netcfg.yaml
+    if [ "$OS" == "Ubuntu" ] && [ "$(lsb_release -sr)" == "20.04" ] && [ -x /usr/sbin/netplan ]; then
+        # Set interface to DHCP
+        interface_name=$(ip -o -4 route show to default | awk '{print $5}')
+        cat <<EOF > /etc/netplan/01-netcfg.yaml
 network:
   version: 2
   renderer: networkd
@@ -22,11 +38,18 @@ network:
     $interface_name:
       dhcp4: yes
 EOF
-  # Apply configuration
-  netplan apply
-  # Display confirmation message
-  whiptail --msgbox "DHCP configuration applied successfully." 10 60
-  exit 0
+        # Apply configuration
+        netplan apply
+        # Display confirmation message
+        whiptail --msgbox "DHCP configuration applied successfully." 10 60
+        exit 0
+    fi
+else
+    # Set DHCP
+    interface_name=$(ip -o -4 route show to default | awk '{print $5}')
+    sudo bash -c "echo 'auto $interface_name' > /etc/network/interfaces.d/$interface_name.cfg"
+    sudo bash -c "echo 'iface $interface_name inet dhcp' >> /etc/network/interfaces.d/$interface_name.cfg"
+    sudo systemctl restart networking.service
 fi
 
 # Define default values for IP configuration
@@ -98,7 +121,7 @@ function display_gateway_dialog {
         whiptail --msgbox "Invalid gateway IP address format." 10 60
         display_gateway_dialog
     fi
-
+     
     # Check that there are exactly 4 octets.
     IFS='.' read -ra ip_arr <<< "$gateway"
     if (( ${#ip_arr[@]} != 4 )); then
@@ -123,7 +146,7 @@ function display_dns_dialog {
         whiptail --msgbox "DNS server IP address cannot be empty." 10 60
         display_dns_dialog
     fi
-
+ 
     # Check that there are exactly 4 octets.
     IFS='.' read -ra ip_arr <<< "$dns"
     if (( ${#ip_arr[@]} != 4 )); then
@@ -148,6 +171,7 @@ display_gateway_dialog
 display_dns_dialog
 
 # Write configuration to file
+if [ "$OS" == "Ubuntu" ] && [ "$(lsb_release -sr)" == "20.04" ] && [ -x /usr/sbin/netplan ]; then
 cat << EOF > /etc/netplan/01-netcfg.yaml
 network:
   version: 2
@@ -163,6 +187,17 @@ EOF
 
 # Apply configuration
 netplan apply &
+else
+# Set the IP address
+    sudo bash -c "echo 'auto $interface_name' > /etc/network/interfaces.d/$interface_name.cfg"
+    sudo bash -c "echo 'iface $interface_name inet static' >> /etc/network/interfaces.d/$interface_name.cfg"
+    sudo bash -c "echo '    address $static_ip' >> /etc/network/interfaces.d/$interface_name.cfg"
+    sudo bash -c "echo '    netmask $netmask' >> /etc/network/interfaces.d/$interface_name.cfg"
+    sudo bash -c "echo '    gateway $gateway' >> /etc/network/interfaces.d/$interface_name.cfg"
+    sudo bash -c "echo '    dns-nameservers $dns' >> /etc/network/interfaces.d/$interface_name.cfg"
+    sudo systemctl restart networking.service
+fi
+
 
 # Display confirmation message
 whiptail --msgbox "Static IP address configuration applied successfully." 10 60
