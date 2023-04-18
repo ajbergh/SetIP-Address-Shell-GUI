@@ -20,7 +20,6 @@ fi
 #echo "Detected Linux distribution: $OS"
 
 
-
 # Prompt user for DHCP or static IP address
 dhcp_or_static=$(whiptail --title "IP Configuration" --menu "Select IP configuration method" 15 60 2 --backtitle "Detected Linux distribution: $OS" \
 "DHCP" "Obtain IP address automatically" \
@@ -70,8 +69,6 @@ gateway=$(ip -o -4 route show to default | awk '{print $3}')
 dns=$(systemd-resolve --status | awk '/DNS Servers:/ {print $3}')
 
 
-
-
 # Define functions for displaying input dialogs
 function display_interface_name_dialog {
     interface_name=$(whiptail --inputbox "Enter the network interface name:" 10 60 $interface_name 3>&1 1>&2 2>&3)
@@ -108,7 +105,6 @@ function display_static_ip_dialog {
     done
 
 }
-
 
 
 function display_netmask_dialog {
@@ -210,8 +206,8 @@ DNS1=$dns
 
 EOF
     systemctl restart network
+	touch /etc/cloud/cloud-init.disabled
 fi
-
 
 # Display confirmation message
 whiptail --msgbox "Static IP address configuration applied successfully." 10 60
