@@ -43,13 +43,23 @@ EOF
         # Display confirmation message
         whiptail --msgbox "DHCP configuration applied successfully." 10 60
         exit 0
-    fi
-else
-    # Set DHCP
-    interface_name=$(ip -o -4 route show to default | awk '{print $5}')
-    sudo bash -c "echo 'auto $interface_name' > /etc/network/interfaces.d/$interface_name.cfg"
-    sudo bash -c "echo 'iface $interface_name inet dhcp' >> /etc/network/interfaces.d/$interface_name.cfg"
-    sudo systemctl restart networking.service
+	else
+        # Set DHCP
+        interface_name=$(ip -o -4 route show to default | awk '{print $5}')
+        cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$interface_name
+
+BOOTPROTO=dhcp
+DEVICE=$interface_name
+ONBOOT=yes
+STARTMODE=auto
+TYPE=Ethernet
+USERCTL=no
+
+EOF
+        systemctl restart network
+        whiptail --msgbox "DHCP configuration applied successfully." 10 60
+        exit 0
+	fi
 fi
 
 # Define default values for IP configuration
@@ -188,14 +198,18 @@ EOF
 # Apply configuration
 netplan apply &
 else
-# Set the IP address
-    sudo bash -c "echo 'auto $interface_name' > /etc/network/interfaces.d/$interface_name.cfg"
-    sudo bash -c "echo 'iface $interface_name inet static' >> /etc/network/interfaces.d/$interface_name.cfg"
-    sudo bash -c "echo '    address $static_ip' >> /etc/network/interfaces.d/$interface_name.cfg"
-    sudo bash -c "echo '    netmask $netmask' >> /etc/network/interfaces.d/$interface_name.cfg"
-    sudo bash -c "echo '    gateway $gateway' >> /etc/network/interfaces.d/$interface_name.cfg"
-    sudo bash -c "echo '    dns-nameservers $dns' >> /etc/network/interfaces.d/$interface_name.cfg"
-    sudo systemctl restart networking.service
+
+    cat <<EOF > /etc/sysconfig/network-scripts/ifcfg-$interface_name
+
+BOOTPROTO=none
+DEVICE=$interface_name
+IPADDR=$static_ip
+PREFIX=$netmask
+GATEWAY=$gateway
+DNS1=$dns
+
+EOF
+    systemctl restart network
 fi
 
 
